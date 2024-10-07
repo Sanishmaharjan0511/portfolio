@@ -1,254 +1,230 @@
 /**
-* Template Name: Laura
-* Updated: Mar 10 2023 with Bootstrap v5.2.3
-* Template URL: https://bootstrapmade.com/laura-free-creative-bootstrap-theme/
-* Author: BootstrapMade.com
-* License: https://bootstrapmade.com/license/
-*/
-(function() {
-  "use strict";
+ * main.js
+ * http://www.codrops.com
+ *
+ * Licensed under the MIT license.
+ * http://www.opensource.org/licenses/mit-license.php
+ * 
+ * Copyright 2016, Codrops
+ * http://www.codrops.com
+ */
+;(function(window) {
 
-  /**
-   * Easy selector helper function
-   */
-  const select = (el, all = false) => {
-    el = el.trim()
-    if (all) {
-      return [...document.querySelectorAll(el)]
-    } else {
-      return document.querySelector(el)
-    }
-  }
+	'use strict';
 
-  /**
-   * Easy event listener function
-   */
-  const on = (type, el, listener, all = false) => {
-    let selectEl = select(el, all)
-    if (selectEl) {
-      if (all) {
-        selectEl.forEach(e => e.addEventListener(type, listener))
-      } else {
-        selectEl.addEventListener(type, listener)
-      }
-    }
-  }
+	// some helper functions
+	/**
+	 * from https://davidwalsh.name/javascript-debounce-function
+	 */
+	function debounce(func, wait, immediate) {
+		var timeout;
+		return function() {
+			var context = this, args = arguments;
+			var later = function() {
+				timeout = null;
+				if (!immediate) func.apply(context, args);
+			};
+			var callNow = immediate && !timeout;
+			clearTimeout(timeout);
+			timeout = setTimeout(later, wait);
+			if (callNow) func.apply(context, args);
+		};
+	};
+	function extend( a, b ) {
+		for( var key in b ) { 
+			if( b.hasOwnProperty( key ) ) {
+				a[key] = b[key];
+			}
+		}
+		return a;
+	}
 
-  /**
-   * Easy on scroll event listener 
-   */
-  const onscroll = (el, listener) => {
-    el.addEventListener('scroll', listener)
-  }
+	// some vars
+	var bodyEl = document.body,
+		// window sizes
+		winsize = { width : window.innerWidth, height : window.innerHeight },
+		// support for animations
+		support = { animations : Modernizr.cssanimations },
+		// animationend event function
+		animEndEventNames = { 'WebkitAnimation' : 'webkitAnimationEnd', 'OAnimation' : 'oAnimationEnd', 'msAnimation' : 'MSAnimationEnd', 'animation' : 'animationend' },
+		animEndEventName = animEndEventNames[ Modernizr.prefixed( 'animation' ) ],
+		onEndAnimation = function( el, callback ) {
+			var onEndCallbackFn = function( ev ) {
+				if( support.animations ) {
+					if( ev.target != this ) return;
+					this.removeEventListener( animEndEventName, onEndCallbackFn );
+				}
+				if( callback && typeof callback === 'function' ) { callback.call(); }
+			};
+			if( support.animations ) {
+				el.addEventListener( animEndEventName, onEndCallbackFn );
+			}
+			else {
+				onEndCallbackFn();
+			}
+		};
 
-  /**
-   * Navbar links active state on scroll
-   */
-  let navbarlinks = select('#navbar .scrollto', true)
-  const navbarlinksActive = () => {
-    let position = window.scrollY + 200
-    navbarlinks.forEach(navbarlink => {
-      if (!navbarlink.hash) return
-      let section = select(navbarlink.hash)
-      if (!section) return
-      if (position >= section.offsetTop && position <= (section.offsetTop + section.offsetHeight)) {
-        navbarlink.classList.add('active')
-      } else {
-        navbarlink.classList.remove('active')
-      }
-    })
-  }
-  window.addEventListener('load', navbarlinksActive)
-  onscroll(document, navbarlinksActive)
+	/**
+	 * Revealer obj
+	 */
+	function Revealer(options) {
+		this.options = extend( {}, this.options );
+		extend( this.options, options );
+		this._init();
+	}
 
-  /**
-   * Scrolls to an element with header offset
-   */
-  const scrollto = (el) => {
-    let header = select('#header')
-    let offset = header.offsetHeight
+	/**
+	 * Revealer default options
+	 */
+	Revealer.prototype.options = {
+		// total number of revealing layers (min is 1)
+		nmbLayers : 1,
+		// bg color for the revealing layers
+		bgcolor : '#fff',
+		// effect classname
+		effect : 'anim--effect-1',
+		// callback
+		onStart : function(direction) { return false; },
+		// callback
+		onEnd : function(direction) { return false; }
+	};
 
-    if (!header.classList.contains('header-scrolled')) {
-      offset -= 20
-    }
+	/**
+	 * build layer structure
+	 * add effect class
+	 * init/bind events
+	 */
+	Revealer.prototype._init = function() {
+		// add revealer layers
+		this._addLayers();
+		// now we have access to the layers
+		this.layers = [].slice.call(this.revealerWrapper.children);
+		// init/bind events
+		this._initEvents();
+	};
 
-    let elementPos = select(el).offsetTop
-    window.scrollTo({
-      top: elementPos - offset,
-      behavior: 'smooth'
-    })
-  }
+	/**
+	 * init/bind events
+	 */
+	Revealer.prototype._initEvents = function() {
+		// window resize: recalculate window sizes
+		this.debounceResize = debounce(function(ev) {
+			winsize = {width: window.innerWidth, height: window.innerHeight};
+		}, 10);
+		window.addEventListener('resize', this.debounceResize);
+	};
 
-  /**
-   * Toggle .header-scrolled class to #header when page is scrolled
-   */
-  let selectHeader = select('#header')
-  if (selectHeader) {
-    const headerScrolled = () => {
-      if (window.scrollY > 100) {
-        selectHeader.classList.add('header-scrolled')
-      } else {
-        selectHeader.classList.remove('header-scrolled')
-      }
-    }
-    window.addEventListener('load', headerScrolled)
-    onscroll(document, headerScrolled)
-  }
+	/**
+	 * build layer structure and append it to the body
+	 * add effect class
+	 */
+	Revealer.prototype._addLayers = function() {
+		this.revealerWrapper = document.createElement('div');
+		this.revealerWrapper.className = 'revealer';
+		classie.add(bodyEl, this.options.effect);
+		var  strHTML = '';
+		for(var i = 0; i < this.options.nmbLayers; ++i) {
+			var bgcolor = typeof this.options.bgcolor === 'string' ? this.options.bgcolor : (this.options.bgcolor instanceof Array && this.options.bgcolor[i] ? this.options.bgcolor[i] : '#fff');
+			strHTML += '<div style="background:' + bgcolor + '" class="revealer__layer"></div>';
+		}
+		this.revealerWrapper.innerHTML = strHTML;
+		bodyEl.appendChild(this.revealerWrapper);
+	};
 
-  /**
-   * Back to top button
-   */
-  let backtotop = select('.back-to-top')
-  if (backtotop) {
-    const toggleBacktotop = () => {
-      if (window.scrollY > 100) {
-        backtotop.classList.add('active')
-      } else {
-        backtotop.classList.remove('active')
-      }
-    }
-    window.addEventListener('load', toggleBacktotop)
-    onscroll(document, toggleBacktotop)
-  }
+	/**
+	 * reveal the layers
+	 * direction: right || left || top || bottom || cornertopleft || cornertopright || cornerbottomleft || cornerbottomright
+	 */
+	Revealer.prototype.reveal = function(direction, callbacktime, callback) {
+		// if animating return
+		if( this.isAnimating ) {
+			return false;
+		}
+		this.isAnimating = true;
+		// current direction
+		this.direction = direction;
+		// onStart callback
+		this.options.onStart(this.direction);
 
-  /**
-   * Mobile nav toggle
-   */
-  on('click', '.mobile-nav-toggle', function(e) {
-    select('#navbar').classList.toggle('navbar-mobile')
-    this.classList.toggle('bi-list')
-    this.classList.toggle('bi-x')
-  })
+		// set the initial position for the layers´ parent
+		var widthVal, heightVal, transform;
+		if( direction === 'cornertopleft' || direction === 'cornertopright' || direction === 'cornerbottomleft' || direction === 'cornerbottomright' ) {
+			var pageDiagonal = Math.sqrt(Math.pow(winsize.width, 2) + Math.pow(winsize.height, 2));
+			widthVal = heightVal = pageDiagonal + 'px';
+			
+			if( direction === 'cornertopleft' ) {
+				transform = 'translate3d(-50%,-50%,0) rotate3d(0,0,1,135deg) translate3d(0,' + pageDiagonal + 'px,0)';
+			}
+			else if( direction === 'cornertopright' ) {
+				transform = 'translate3d(-50%,-50%,0) rotate3d(0,0,1,-135deg) translate3d(0,' + pageDiagonal + 'px,0)';
+			}
+			else if( direction === 'cornerbottomleft' ) {
+				transform = 'translate3d(-50%,-50%,0) rotate3d(0,0,1,45deg) translate3d(0,' + pageDiagonal + 'px,0)';
+			}
+			else if( direction === 'cornerbottomright' ) {
+				transform = 'translate3d(-50%,-50%,0) rotate3d(0,0,1,-45deg) translate3d(0,' + pageDiagonal + 'px,0)';
+			}
+		}
+		else if( direction === 'left' || direction === 'right' ) {
+			widthVal = '100vh'
+			heightVal = '100vw';
+			transform = 'translate3d(-50%,-50%,0) rotate3d(0,0,1,' + (direction === 'left' ? 90 : -90) + 'deg) translate3d(0,100%,0)';
+		}
+		else if( direction === 'top' || direction === 'bottom' ) {
+			widthVal = '100vw';
+			heightVal = '100vh';
+			transform = direction === 'top' ? 'rotate3d(0,0,1,180deg)' : 'none';
+		}
 
-  /**
-   * Mobile nav dropdowns activate
-   */
-  on('click', '.navbar .dropdown > a', function(e) {
-    if (select('#navbar').classList.contains('navbar-mobile')) {
-      e.preventDefault()
-      this.nextElementSibling.classList.toggle('dropdown-active')
-    }
-  }, true)
+		this.revealerWrapper.style.width = widthVal;
+		this.revealerWrapper.style.height = heightVal;
+		this.revealerWrapper.style.WebkitTransform = this.revealerWrapper.style.transform = transform;
+		this.revealerWrapper.style.opacity = 1;
 
-  /**
-   * Scrool with ofset on links with a class name .scrollto
-   */
-  on('click', '.scrollto', function(e) {
-    if (select(this.hash)) {
-      e.preventDefault()
+		// add direction and animate classes to parent
+		classie.add(this.revealerWrapper, 'revealer--' + direction || 'revealer--right');
+		classie.add(this.revealerWrapper, 'revealer--animate');
 
-      let navbar = select('#navbar')
-      if (navbar.classList.contains('navbar-mobile')) {
-        navbar.classList.remove('navbar-mobile')
-        let navbarToggle = select('.mobile-nav-toggle')
-        navbarToggle.classList.toggle('bi-list')
-        navbarToggle.classList.toggle('bi-x')
-      }
-      scrollto(this.hash)
-    }
-  }, true)
+		// track the end of the animation for all layers
+		var self = this, layerscomplete = 0;
+		this.layers.forEach(function(layer) {
+			onEndAnimation(layer, function() {
+				++layerscomplete;
+				if( layerscomplete === self.options.nmbLayers ) {
+					classie.remove(self.revealerWrapper, 'revealer--' + direction || 'revealer--right');
+					classie.remove(self.revealerWrapper, 'revealer--animate');
+					
+					self.revealerWrapper.style.opacity = 0;
+					self.isAnimating = false;
 
-  /**
-   * Scroll with ofset on page load with hash links in the url
-   */
-  window.addEventListener('load', () => {
-    if (window.location.hash) {
-      if (select(window.location.hash)) {
-        scrollto(window.location.hash)
-      }
-    }
-  });
+					// callback
+					self.options.onEnd(self.direction);
+				}
+			});
+		});
+			
+		// reveal fn callback
+		if( typeof callback === 'function') {
+			if( this.callbacktimeout ) {
+				clearTimeout(this.callbacktimeout);
+			}
+			this.callbacktimeout = setTimeout(callback, callbacktime);
+		}
+	};
 
-  /**
-   * Skills animation
-   */
-  let skilsContent = select('.skills-content');
-  if (skilsContent) {
-    new Waypoint({
-      element: skilsContent,
-      offset: '80%',
-      handler: function(direction) {
-        let progress = select('.progress .progress-bar', true);
-        progress.forEach((el) => {
-          el.style.width = el.getAttribute('aria-valuenow') + '%'
-        });
-      }
-    })
-  }
+	/**
+	 * destroy method
+	 */
+	Revealer.prototype.destroy = function() {
+		classie.remove(bodyEl, this.options.effect);
+		window.removeEventListener('resize', this.debounceResize);
+		bodyEl.removeChild(this.revealerWrapper);
+	};
 
-  /**
-   * Testimonials slider
-   */
-  new Swiper('.testimonials-slider', {
-    speed: 600,
-    loop: true,
-    autoplay: {
-      delay: 5000,
-      disableOnInteraction: false
-    },
-    slidesPerView: 'auto',
-    pagination: {
-      el: '.swiper-pagination',
-      type: 'bullets',
-      clickable: true
-    }
-  });
+	window.Revealer = Revealer;
 
-  /**
-   * Porfolio isotope and filter
-   */
-  window.addEventListener('load', () => {
-    let portfolioContainer = select('.portfolio-container');
-    if (portfolioContainer) {
-      let portfolioIsotope = new Isotope(portfolioContainer, {
-        itemSelector: '.portfolio-item'
-      });
+})(window);
 
-      let portfolioFilters = select('#portfolio-flters li', true);
+			
 
-      on('click', '#portfolio-flters li', function(e) {
-        e.preventDefault();
-        portfolioFilters.forEach(function(el) {
-          el.classList.remove('filter-active');
-        });
-        this.classList.add('filter-active');
 
-        portfolioIsotope.arrange({
-          filter: this.getAttribute('data-filter')
-        });
-
-      }, true);
-    }
-
-  });
-
-  /**
-   * Initiate portfolio lightbox 
-   */
-  const portfolioLightbox = GLightbox({
-    selector: '.portfolio-lightbox'
-  });
-
-  /**
-   * Portfolio details slider
-   */
-  new Swiper('.portfolio-details-slider', {
-    speed: 400,
-    loop: true,
-    autoplay: {
-      delay: 5000,
-      disableOnInteraction: false
-    },
-    pagination: {
-      el: '.swiper-pagination',
-      type: 'bullets',
-      clickable: true
-    }
-  });
-
-  /**
-   * Initiate Pure Counter 
-   */
-  new PureCounter();
-
-})()
